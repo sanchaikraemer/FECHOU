@@ -33,6 +33,8 @@ export interface Message {
   docMeta?: string;
   src?: string;
   cap?: string;
+  /** Nome do arquivo de áudio (.opus) no export — usado para casar com o upload e transcrever. */
+  file?: string;
 }
 
 export interface AnalysisChip {

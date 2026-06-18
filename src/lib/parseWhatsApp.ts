@@ -64,11 +64,13 @@ export function parseWhatsApp(text: string, myName: string): ParsedConversation 
       ) {
         const nm = body.replace(/\(arquivo anexado\)/i, "").trim();
         if (/\.opus/i.test(body))
+          // Áudio: vira mensagem 'audio' pendente. Se o arquivo for enviado no
+          // import, transcrevemos via Whisper e preenchemos o transcript.
           out.push({
-            k: "doc",
+            k: "audio",
             from: side,
-            docName: "Áudio de voz",
-            docMeta: "transcrição no servidor",
+            transcript: "",
+            file: nm || "audio.opus",
             t: m[2],
           });
         else if (/\.pdf/i.test(body))

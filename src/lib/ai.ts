@@ -51,6 +51,20 @@ export function fallbackSuggestions(): Suggestion[] {
   ];
 }
 
+/** Transcreve um arquivo de áudio via /api/transcribe (Whisper). Devolve null se indisponível. */
+export async function transcribeAudio(file: File): Promise<string | null> {
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/api/transcribe", { method: "POST", body: fd });
+    const data = await r.json();
+    if (data && data.ok && typeof data.text === "string") return data.text;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Chama a rota /api/analyze (que conversa com a OpenAI). Devolve null se indisponível. */
 export async function callAnalyze(
   messages: Message[],

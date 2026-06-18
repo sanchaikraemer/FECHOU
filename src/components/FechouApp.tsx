@@ -11,8 +11,21 @@ import type {
   Tone,
 } from "@/lib/types";
 import { parseWhatsApp } from "@/lib/parseWhatsApp";
-import { buildSuggestions, callAnalyze, fallbackSuggestions } from "@/lib/ai";
+import {
+  buildSuggestions,
+  callAnalyze,
+  fallbackSuggestions,
+  transcribeAudio,
+} from "@/lib/ai";
 import { CONV_ORDER, initialConvs, SAMPLE, TEMPLATES } from "@/lib/sample";
+import { useRouter } from "next/navigation";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  fetchConversations,
+  getCurrentEmail,
+  saveConversation,
+  signOut,
+} from "@/lib/supabase/conversations";
 
 const WAVE = [8, 14, 20, 11, 22, 9, 16, 24, 12, 18, 8, 15, 21, 10];
 
@@ -43,10 +56,18 @@ export default function FechouApp() {
   const [importText, setImportText] = useState(SAMPLE);
   const [aiError, setAiError] = useState("");
   const [parsedCount, setParsedCount] = useState(0);
+  const [mediaCount, setMediaCount] = useState(0);
+  const [transcribeMsg, setTranscribeMsg] = useState("");
   const [convs, setConvs] = useState<Record<string, Conversation>>(initialConvs);
+  const [dynamicIds, setDynamicIds] = useState<string[]>([]);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
+  const router = useRouter();
+  const supaOn = isSupabaseConfigured();
   const msgRef = useRef<HTMLDivElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Arquivos de mídia anexados no import (chave = nome do arquivo).
+  const mediaRef = useRef<Map<string, File>>(new Map());
 
   const delay = (ms: number) =>
     new Promise<void>((r) => {
@@ -70,6 +91,32 @@ export default function FechouApp() {
     }
   }, []);
 
+  // Auth + conversas salvas (só quando o Supabase está configurado).
+  useEffect(() => {
+    if (!supaOn) return;
+    let alive = true;
+    (async () => {
+      const email = await getCurrentEmail();
+      if (alive) setUserEmail(email);
+      const saved = await fetchConversations();
+      if (alive && saved.length) {
+        setConvs((prev) => {
+          const merged = { ...prev };
+          for (const c of saved) merged[c.id] = c;
+          return merged;
+        });
+        setDynamicIds((prev) => {
+          const ids = saved.map((c) => c.id);
+          const rest = prev.filter((id) => !ids.includes(id));
+          return [...ids, ...rest];
+        });
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [supaOn]);
+
   useEffect(() => {
     if (screen === "chat" && msgRef.current) {
       msgRef.current.scrollTop = msgRef.current.scrollHeight;
@@ -88,6 +135,22 @@ export default function FechouApp() {
   const back = () => {
     setScreen("inbox");
     setShowTemplates(false);
+  };
+
+  const handleAvatar = async () => {
+    if (!supaOn) return;
+    if (userEmail) {
+      if (
+        typeof window !== "undefined" &&
+        window.confirm(`Sair de ${userEmail}?`)
+      ) {
+        await signOut();
+        setUserEmail(null);
+        window.location.reload();
+      }
+    } else {
+      router.push("/login");
+    }
   };
 
   const refresh = async () => {
@@ -119,10 +182,32 @@ export default function FechouApp() {
   const openImport = () => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
+    mediaRef.current = new Map();
+    setMediaCount(0);
+    setTranscribeMsg("");
     setScreen("importing");
     setAiBusy(false);
     setAiError("");
     setImportStep(0);
+  };
+
+  // Upload dos arquivos da conversa: detecta o .txt e guarda as mídias (áudios/anexos).
+  const onPickFiles = (files: FileList | null) => {
+    if (!files || !files.length) return;
+    let txtFile: File | null = null;
+    Array.from(files).forEach((f) => {
+      if (/\.txt$/i.test(f.name)) {
+        if (!txtFile) txtFile = f;
+      } else {
+        mediaRef.current.set(f.name, f);
+      }
+    });
+    setMediaCount(mediaRef.current.size);
+    if (txtFile) {
+      const reader = new FileReader();
+      reader.onload = () => setImportText(String(reader.result || ""));
+      reader.readAsText(txtFile);
+    }
   };
   const skipImport = () => {
     timersRef.current.forEach(clearTimeout);
@@ -149,6 +234,24 @@ export default function FechouApp() {
     setParsedCount(parsed.count);
     await delay(450);
     setImportStep(2);
+    // Transcreve os áudios cujos arquivos .opus foram enviados (Whisper).
+    const pendingAudios = parsed.messages.filter(
+      (m) => m.k === "audio" && m.file && mediaRef.current.has(m.file),
+    );
+    if (pendingAudios.length) {
+      for (let i = 0; i < pendingAudios.length; i++) {
+        const m = pendingAudios[i];
+        setTranscribeMsg(
+          `Transcrevendo áudios… ${i + 1}/${pendingAudios.length}`,
+        );
+        const f = m.file ? mediaRef.current.get(m.file) : undefined;
+        if (f) {
+          const text = await transcribeAudio(f);
+          if (text) m.transcript = text;
+        }
+      }
+      setTranscribeMsg("");
+    }
     await delay(450);
     setImportStep(3);
     setImportStep(4);
@@ -190,8 +293,9 @@ export default function FechouApp() {
         .join("")
         .toUpperCase()
         .slice(0, 2) || "IM";
+    const newId = "imp-" + Date.now();
     const conv: Conversation = {
-      id: "importada",
+      id: newId,
       name: parsed.themName,
       initials: ini,
       color: "#1FA99A",
@@ -209,8 +313,10 @@ export default function FechouApp() {
       messages: parsed.messages,
       suggestions: sug,
     };
-    setConvs((prev) => ({ ...prev, importada: conv }));
-    setActiveId("importada");
+    setConvs((prev) => ({ ...prev, [newId]: conv }));
+    setDynamicIds((prev) => [newId, ...prev]);
+    void saveConversation(conv);
+    setActiveId(newId);
     setScreen("chat");
     setAiBusy(false);
     setPanelOpen(true);
@@ -247,7 +353,10 @@ export default function FechouApp() {
   };
 
   // ---- derived ----
-  const order = convs["importada"] ? ["importada", ...CONV_ORDER] : CONV_ORDER;
+  const order = [
+    ...dynamicIds.filter((id) => convs[id]),
+    ...CONV_ORDER.filter((id) => convs[id]),
+  ];
   const allList = order.map((id) => convs[id]).filter(Boolean);
   const counts = {
     todas: allList.length,
@@ -389,38 +498,65 @@ export default function FechouApp() {
                 {m.dur}
               </span>
             </div>
-            <div
-              style={{
-                marginTop: "9px",
-                fontSize: "13.5px",
-                lineHeight: 1.5,
-                color: bubbleColor,
-                fontStyle: "italic",
-              }}
-            >
-              “{m.transcript}”
-            </div>
-            <div
-              style={{
-                marginTop: "6px",
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-              }}
-            >
-              <span
+            {m.transcript ? (
+              <>
+                <div
+                  style={{
+                    marginTop: "9px",
+                    fontSize: "13.5px",
+                    lineHeight: 1.5,
+                    color: bubbleColor,
+                    fontStyle: "italic",
+                  }}
+                >
+                  “{m.transcript}”
+                </div>
+                <div
+                  style={{
+                    marginTop: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      color: audioAccent,
+                    }}
+                  >
+                    🎙️ TRANSCRITO POR IA
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: "10px", color: metaColor }}>
+                    {m.t}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div
                 style={{
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  letterSpacing: "0.04em",
-                  color: audioAccent,
+                  marginTop: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
                 }}
               >
-                🎙️ TRANSCRITO POR IA
-              </span>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontSize: "10px", color: metaColor }}>{m.t}</span>
-            </div>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: metaColor,
+                    fontStyle: "italic",
+                  }}
+                >
+                  Áudio — anexe o .opus para transcrever
+                </span>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: "10px", color: metaColor }}>{m.t}</span>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -729,22 +865,48 @@ export default function FechouApp() {
                     }}
                   />
                 </div>
-                <div
-                  style={{
-                    width: "38px",
-                    height: "38px",
-                    borderRadius: "12px",
-                    background: "#16171C",
-                    color: "#3FBE86",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "'Bricolage Grotesque'",
-                    fontWeight: 700,
-                    fontSize: "15px",
-                  }}
-                >
-                  {(myName.trim()[0] || "S").toUpperCase()}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {supaOn && !userEmail && (
+                    <button
+                      onClick={() => router.push("/login")}
+                      style={{
+                        border: "1px solid #E7E4DA",
+                        background: "#fff",
+                        color: "#16171C",
+                        fontWeight: 700,
+                        fontSize: "12.5px",
+                        padding: "7px 12px",
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Entrar
+                    </button>
+                  )}
+                  <div
+                    onClick={handleAvatar}
+                    title={userEmail || undefined}
+                    style={{
+                      width: "38px",
+                      height: "38px",
+                      borderRadius: "12px",
+                      background: "#16171C",
+                      color: "#3FBE86",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontFamily: "'Bricolage Grotesque'",
+                      fontWeight: 700,
+                      fontSize: "15px",
+                      cursor: supaOn ? "pointer" : "default",
+                    }}
+                  >
+                    {(userEmail
+                      ? userEmail[0]
+                      : myName.trim()[0] || "S"
+                    ).toUpperCase()}
+                  </div>
                 </div>
               </div>
               <div style={{ marginTop: "13px" }}>
@@ -1083,6 +1245,80 @@ export default function FechouApp() {
 
                 <div
                   style={{
+                    marginTop: "16px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.05em",
+                    color: "#7E8290",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Arquivos da conversa (.txt + áudios)
+                </div>
+                <label
+                  style={{
+                    marginTop: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    cursor: "pointer",
+                    background: "#21232C",
+                    border: "1px dashed #3A3D48",
+                    borderRadius: "13px",
+                    padding: "13px",
+                  }}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    accept=".txt,.opus,.ogg,.m4a,.mp3,.wav,.jpg,.jpeg,.png,.pdf,audio/*,image/*"
+                    onChange={(e) => onPickFiles(e.target.files)}
+                    style={{ display: "none" }}
+                  />
+                  <span
+                    style={{
+                      width: "34px",
+                      height: "34px",
+                      borderRadius: "10px",
+                      background: "#128A5B",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "17px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    📎
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span
+                      style={{
+                        display: "block",
+                        color: "#E8E9EE",
+                        fontSize: "13.5px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Selecionar arquivos exportados
+                    </span>
+                    <span
+                      style={{
+                        display: "block",
+                        color: "#7E8290",
+                        fontSize: "11.5px",
+                        marginTop: "1px",
+                      }}
+                    >
+                      {mediaCount
+                        ? `${mediaCount} mídia(s) anexada(s) · áudios serão transcritos`
+                        : "o .txt preenche abaixo; os áudios (.opus) viram transcrição"}
+                    </span>
+                  </span>
+                </label>
+
+                <div
+                  style={{
                     marginTop: "14px",
                     fontSize: "11px",
                     fontWeight: 700,
@@ -1091,7 +1327,7 @@ export default function FechouApp() {
                     textTransform: "uppercase",
                   }}
                 >
-                  Conversa exportada (.txt)
+                  …ou cole o texto aqui
                 </div>
                 <textarea
                   value={importText}
@@ -1121,9 +1357,10 @@ export default function FechouApp() {
                     lineHeight: 1.5,
                   }}
                 >
-                  🎙️ Áudios entram como{" "}
-                  <b style={{ color: "#9DA2B3" }}>[áudio]</b> — a transcrição de
-                  voz (Whisper/OpenAI) roda no servidor e entra na fase de áudio.
+                  🎙️ Anexe os áudios <b style={{ color: "#9DA2B3" }}>.opus</b>{" "}
+                  junto e eles são transcritos automaticamente (Whisper/OpenAI).
+                  Se colar só o texto, os áudios ficam como{" "}
+                  <b style={{ color: "#9DA2B3" }}>[áudio]</b>.
                 </div>
 
                 {aiError && (
@@ -1219,6 +1456,32 @@ export default function FechouApp() {
                     </div>
                   </div>
                 </div>
+                {transcribeMsg && (
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "9px",
+                      color: "#3FBE86",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        borderRadius: "50%",
+                        border: "2px solid #2E3039",
+                        borderTopColor: "#3FBE86",
+                        animation: "fechouSpin .7s linear infinite",
+                        flexShrink: 0,
+                      }}
+                    />
+                    {transcribeMsg}
+                  </div>
+                )}
                 <div
                   style={{
                     marginTop: "22px",

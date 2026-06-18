@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Fechou — offline</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#128A5B" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: #16171c;
+        color: #e8e9ee;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+      }
+      .wrap { max-width: 320px; }
+      .logo {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 7px;
+        font-weight: 800;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #3fbe86;
+        transform: translateY(-4px);
+      }
+      h1 { font-size: 19px; margin: 22px 0 8px; font-weight: 700; }
+      p { font-size: 14px; line-height: 1.5; color: #9da2b3; margin: 0 0 22px; }
+      button {
+        border: none;
+        cursor: pointer;
+        background: #128a5b;
+        color: #fff;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 12px 22px;
+        border-radius: 12px;
+        font-family: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="logo">Fechou<span class="dot"></span></div>
+      <h1>Você está offline</h1>
+      <p>
+        Sem conexão agora. Reconecte para importar conversas e gerar sugestões
+        com a IA.
+      </p>
+      <button onclick="location.reload()">Tentar de novo</button>
+    </div>
+  </body>
+</html>
