@@ -1,7 +1,7 @@
 {
-  "name": "Fechou — respostas que fecham",
-  "short_name": "Fechou",
-  "description": "Importa conversas do WhatsApp, analisa a negociação e sugere a resposta certa.",
+  "name": "Radar — análise de negociação",
+  "short_name": "Radar",
+  "description": "Importe uma conversa do WhatsApp e descubra exatamente o que fazer para avançar a negociação.",
   "lang": "pt-BR",
   "dir": "ltr",
   "categories": ["business", "productivity"],
@@ -9,8 +9,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#16171C",
-  "theme_color": "#128A5B",
+  "background_color": "#0F1117",
+  "theme_color": "#0F1117",
   "icons": [
     {
       "src": "/assets/icon-192.png",
@@ -40,8 +40,6 @@
             "application/zip",
             "application/octet-stream",
             "audio/*",
-            "image/*",
-            "video/*",
             ".txt",
             ".zip",
             ".opus",

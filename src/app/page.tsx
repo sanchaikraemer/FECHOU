@@ -1,5 +1,5 @@
-import FechouApp from "@/components/FechouApp";
+import RadarApp from "@/components/RadarApp";
 
 export default function Page() {
-  return <FechouApp />;
+  return <RadarApp />;
 }

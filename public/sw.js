@@ -1,14 +1,7 @@
-// Service worker do Fechou — instalável + shell offline + Share Target.
-// Estratégia segura para Next.js:
-//   • POST /share → recebe a conversa do WhatsApp, guarda os arquivos e
-//                   redireciona pra /?shared=1 (o app lê e processa)
-//   • navegações  → network-first, com fallback para /offline.html
-//   • _next/static e /assets (imutáveis, com hash) → cache-first
-//   • API e o resto → passthrough (rede)
-const VERSION = "fechou-v2";
+const VERSION = "radar-v1";
 const PRECACHE = `${VERSION}-precache`;
 const RUNTIME = `${VERSION}-runtime`;
-const SHARE_CACHE = "fechou-share"; // transitório: guarda o que veio do WhatsApp
+const SHARE_CACHE = "radar-share";
 const PRECACHE_URLS = [
   "/offline.html",
   "/manifest.json",
@@ -40,8 +33,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Recebe a conversa exportada do WhatsApp (texto + áudios) e a deixa no cache
-// pra o app consumir. Ignorar/filtrar mídia é responsabilidade do app.
 async function handleShareTarget(request) {
   try {
     const form = await request.formData();
@@ -74,8 +65,8 @@ async function handleShareTarget(request) {
         { headers: { "content-type": "application/json" } },
       ),
     );
-  } catch (e) {
-    // se algo falhar, segue pro app mesmo assim
+  } catch {
+    /* segue mesmo com erro */
   }
   return Response.redirect(
     new URL("/?shared=1", self.location.origin).toString(),
@@ -87,16 +78,14 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Share Target do WhatsApp
   if (req.method === "POST" && url.pathname === "/share") {
     event.respondWith(handleShareTarget(req));
     return;
   }
 
   if (req.method !== "GET") return;
-  if (url.origin !== self.location.origin) return; // só mesma origem
+  if (url.origin !== self.location.origin) return;
 
-  // Navegações → network-first, fallback offline
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req).catch(() =>
@@ -106,7 +95,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Estáticos imutáveis → cache-first
   if (
     url.pathname.startsWith("/_next/static") ||
     url.pathname.startsWith("/assets")
@@ -124,5 +112,4 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-  // resto (inclui /api/*) → passthrough
 });

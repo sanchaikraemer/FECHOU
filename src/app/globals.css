@@ -1,11 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  color-scheme: light;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -17,53 +9,14 @@ body {
 }
 
 body {
-  background: #101117;
+  background: #0B0D12;
   font-family: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-@keyframes fechouDot {
-  0%,
-  60%,
-  100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-@keyframes fechouShimmer {
-  0% {
-    background-position: -180px 0;
-  }
-  100% {
-    background-position: 240px 0;
-  }
-}
-@keyframes fechouSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes fechouBar {
-  0%,
-  100% {
-    transform: scaleY(0.5);
-  }
-  50% {
-    transform: scaleY(1);
-  }
+@keyframes radarSpin {
+  to { transform: rotate(360deg); }
 }
 
-.fechou-scroll::-webkit-scrollbar {
-  display: none;
-}
-.fechou-scroll {
-  scrollbar-width: none;
-}
-.fechou-shell {
-  height: 100vh;
-  height: 100dvh;
-}
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
