@@ -146,22 +146,22 @@ export default function RadarApp() {
 
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
     setIsIOS(ios);
-    if (ios) { setShowInstall(true); return; }
+    setShowInstall(true);
 
     const handler = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e as BeforeInstallPromptEvent);
-      setShowInstall(true);
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
   const handleInstall = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") setShowInstall(false);
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === "accepted") setShowInstall(false);
+    }
   };
 
   useEffect(() => {
@@ -429,53 +429,43 @@ export default function RadarApp() {
                 margin: "20px 20px 0",
                 background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: "16px", padding: "16px",
-                display: "flex", alignItems: "center", gap: "14px",
               }}>
-                <div style={{
-                  width: "40px", height: "40px", borderRadius: "12px",
-                  background: C.coralDim, border: `1px solid ${C.coralBorder}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
                   <LogoSymbol size={24} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: C.text }}>
+                  <div style={{ flex: 1, fontSize: "13px", fontWeight: 700, color: C.text }}>
                     Instale o Radar no celular
                   </div>
-                  {isIOS ? (
-                    <div style={{ fontSize: "12px", color: C.muted, marginTop: "3px", lineHeight: 1.5 }}>
-                      Toque em <strong style={{ color: C.text }}>Compartilhar</strong> → <strong style={{ color: C.text }}>Adicionar à tela de início</strong>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: "12px", color: C.muted, marginTop: "3px" }}>
-                      Acesso rápido e funciona offline
-                    </div>
-                  )}
+                  <button
+                    onClick={() => setShowInstall(false)}
+                    style={{
+                      background: "none", border: "none", color: C.muted,
+                      fontSize: "20px", cursor: "pointer", padding: "0",
+                      lineHeight: 1, flexShrink: 0,
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
-                {!isIOS && (
+                {isIOS ? (
+                  <div style={{ fontSize: "13px", color: C.muted, lineHeight: 1.6 }}>
+                    No Safari: toque em <strong style={{ color: C.text }}>Compartilhar</strong> → <strong style={{ color: C.text }}>Adicionar à tela de início</strong>
+                  </div>
+                ) : installPrompt ? (
                   <button
                     onClick={handleInstall}
                     style={{
-                      background: C.coral, border: "none", color: "#fff",
-                      fontWeight: 700, fontSize: "12px", fontFamily: INTER,
-                      padding: "8px 14px", borderRadius: "10px", cursor: "pointer",
-                      flexShrink: 0,
+                      width: "100%", background: C.coral, border: "none", color: "#fff",
+                      fontWeight: 700, fontSize: "13px", fontFamily: INTER,
+                      padding: "11px 0", borderRadius: "10px", cursor: "pointer",
                     }}
                   >
-                    Instalar
+                    Instalar agora
                   </button>
+                ) : (
+                  <div style={{ fontSize: "13px", color: C.muted, lineHeight: 1.6 }}>
+                    No Chrome: toque nos <strong style={{ color: C.text }}>3 pontos</strong> → <strong style={{ color: C.text }}>Adicionar à tela inicial</strong>
+                  </div>
                 )}
-                <button
-                  onClick={() => setShowInstall(false)}
-                  style={{
-                    background: "none", border: "none", color: C.muted,
-                    fontSize: "18px", cursor: "pointer", padding: "0 2px",
-                    lineHeight: 1, flexShrink: 0,
-                  }}
-                >
-                  ×
-                </button>
               </div>
             )}
 
