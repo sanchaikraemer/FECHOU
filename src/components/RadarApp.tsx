@@ -33,8 +33,12 @@ async function expandFiles(input: File[]): Promise<File[]> {
       try {
         const buf = new Uint8Array(await f.arrayBuffer());
         const entries = unzipSync(buf);
-        for (const path of Object.keys(entries)) {
-          if (path.endsWith("/")) continue;
+        // sort paths so the largest .txt comes first (main conversation over readme/logs)
+        const paths = Object.keys(entries).filter((p) => !p.endsWith("/"));
+        const txtPaths = paths.filter((p) => /\.txt$/i.test(p.split("/").pop() || p));
+        const otherPaths = paths.filter((p) => !/\.txt$/i.test(p.split("/").pop() || p));
+        txtPaths.sort((a, b) => entries[b].length - entries[a].length);
+        for (const path of [...txtPaths, ...otherPaths]) {
           const base = path.split("/").pop() || path;
           out.push(new File([entries[path]], base, { type: guessType(base) }));
         }
@@ -155,13 +159,18 @@ export default function RadarApp() {
       (m) => m.k === "audio" && m.file && mediaRef.current.has(m.file),
     );
     let transcribed = 0;
-    for (const m of pendingAudios) {
-      setStepDetail(`Áudio ${++transcribed}/${pendingAudios.length}`);
-      const f = m.file ? mediaRef.current.get(m.file) : undefined;
-      if (f) {
-        const t = await transcribeAudio(f);
-        if (t) m.transcript = t;
-      }
+    const BATCH = 5;
+    for (let i = 0; i < pendingAudios.length; i += BATCH) {
+      const batch = pendingAudios.slice(i, i + BATCH);
+      await Promise.all(batch.map(async (m) => {
+        const f = m.file ? mediaRef.current.get(m.file) : undefined;
+        if (f) {
+          const t = await transcribeAudio(f);
+          if (t) m.transcript = t;
+        }
+        transcribed++;
+        setStepDetail(`Áudio ${transcribed}/${pendingAudios.length}`);
+      }));
     }
 
     setStep(3);
