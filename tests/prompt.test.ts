@@ -37,6 +37,9 @@ test("prompt contém regras comerciais obrigatórias", () => {
   assert.match(prompt, /uma única pergunta principal/);
   assert.match(prompt, /último compromisso do cliente/i);
   assert.match(prompt, /pendência financeira/i);
+  assert.match(prompt, /elemento concreto extraído da conversa/i);
+  assert.match(prompt, /Passando para verificar/);
+  assert.match(prompt, /nome do cliente/i);
 });
 
 test("normaliza JSON, limita prioridade e preserva diagnóstico", () => {
