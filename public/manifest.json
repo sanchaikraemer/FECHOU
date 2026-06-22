@@ -1,16 +1,17 @@
 {
-  "name": "Radar — análise de negociação",
+  "name": "Radar de Vendas",
   "short_name": "Radar",
-  "description": "Importe uma conversa do WhatsApp e descubra exatamente o que fazer para avançar a negociação.",
+  "description": "Análise comercial de conversas imobiliárias exportadas do WhatsApp.",
   "lang": "pt-BR",
   "dir": "ltr",
   "categories": ["business", "productivity"],
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0F1117",
-  "theme_color": "#0F1117",
+  "background_color": "#0C1D24",
+  "theme_color": "#0C1D24",
   "icons": [
     {
       "src": "/assets/icon-192.png",
@@ -46,7 +47,9 @@
             ".ogg",
             ".m4a",
             ".mp3",
-            ".aac"
+            ".wav",
+            ".aac",
+            ".amr"
           ]
         }
       ]

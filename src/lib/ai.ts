@@ -1,32 +1,47 @@
 import type { Message, RadarResult } from "./types";
 
-export async function transcribeAudio(file: File): Promise<string | null> {
+export interface ApiResult<T> {
+  data: T | null;
+  reason?: string;
+}
+
+export async function transcribeAudio(file: File): Promise<ApiResult<string>> {
   try {
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch("/api/transcribe", { method: "POST", body: fd });
-    const data = await r.json();
-    if (data && data.ok && typeof data.text === "string") return data.text;
-    return null;
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch("/api/transcribe", { method: "POST", body: form });
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      text?: string;
+      reason?: string;
+    };
+    if (response.ok && payload.ok && typeof payload.text === "string") {
+      return { data: payload.text };
+    }
+    return { data: null, reason: payload.reason || `http_${response.status}` };
   } catch {
-    return null;
+    return { data: null, reason: "network" };
   }
 }
 
 export async function callAnalyze(
   messages: Message[],
   myName: string,
-): Promise<RadarResult | null> {
+): Promise<ApiResult<RadarResult>> {
   try {
-    const r = await fetch("/api/analyze", {
+    const response = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages, myName }),
     });
-    const data = await r.json();
-    if (data && data.ok && data.result) return data.result as RadarResult;
-    return null;
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      result?: RadarResult;
+      reason?: string;
+    };
+    if (response.ok && payload.ok && payload.result) return { data: payload.result };
+    return { data: null, reason: payload.reason || `http_${response.status}` };
   } catch {
-    return null;
+    return { data: null, reason: "network" };
   }
 }
