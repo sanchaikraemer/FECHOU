@@ -321,7 +321,10 @@ export default function RadarApp() {
           <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "0 0 32px" }}>
 
             <div style={{ padding: "52px 24px 0" }}>
-              <LogoRow size={26} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <LogoRow size={26} />
+                <span style={{ fontSize: "11px", fontWeight: 700, color: C.border, letterSpacing: "0.06em" }}>v003</span>
+              </div>
               <div style={{
                 fontFamily: SORA, fontWeight: 800, fontSize: "28px",
                 lineHeight: 1.2, letterSpacing: "-0.02em", color: C.text, marginTop: "28px",
